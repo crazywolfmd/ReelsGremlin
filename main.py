@@ -9,7 +9,11 @@ st.set_page_config(
 )
 
 # ------------------ HEADER ------------------
-st.title("⬇️ Social Media Content Downloader")
+st.markdown(
+    "<h2 style='margin-bottom:0.3rem;'>⬇️ Social Media Content Downloader</h2>",
+    unsafe_allow_html=True
+)
+
 st.caption("Analyze and download content from major platforms")
 
 st.divider()
