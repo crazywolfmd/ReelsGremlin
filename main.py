@@ -10,7 +10,7 @@ st.set_page_config(
 
 # ------------------ HEADER ------------------
 st.markdown(
-    "<h2 style='margin-bottom:0.3rem;'>⬇️ Social Media Content Downloader</h2>",
+    "<h3 style='margin-bottom:0.3rem;'>⬇️ Reels Gremlin tool</h2>",
     unsafe_allow_html=True
 )
 
