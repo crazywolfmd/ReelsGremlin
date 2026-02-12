@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,16 @@ from platforms import facebook, instagram, tiktok, youtube
 
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(os.getenv("APP_LOG_FILE", "app.log"), encoding="utf-8"),
+    ],
+)
+
 logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Reels Gremlin", page_icon="RG", layout="centered")
@@ -78,23 +89,8 @@ def render_metadata(result: dict[str, Any]) -> None:
         st.image(result["thumbnail"], use_container_width=True)
 
     st.subheader(result.get("title") or "Untitled")
-
-    with st.expander("Details", expanded=True):
-        st.write("**Description**")
-        st.write(result.get("description") or "No description")
-
-        uploader = result.get("uploader")
-        if uploader:
-            st.write(f"**Uploader:** {uploader}")
-
-        duration = result.get("duration")
-        if duration:
-            st.write(f"**Duration (sec):** {duration}")
-
-        tags = result.get("tags") or []
-        if tags:
-            st.write("**Tags**")
-            st.write(", ".join(tags))
+    st.write("**Description**")
+    st.write(result.get("description") or "No description")
 
 
 def media_options(module: Any) -> list[str]:
@@ -103,28 +99,32 @@ def media_options(module: Any) -> list[str]:
     return ["video"]
 
 
+def prepare_download(module: Any, url: str, media_type: str) -> None:
+    clear_prepared()
+    sweep_temp_files()
+
+    with st.spinner(f"Preparing {media_type} file..."):
+        try:
+            prepared = module.download(url, media_type, TEMP_DIR)
+            st.session_state.prepared = prepared
+            st.success(f"{media_type.capitalize()} is ready.")
+        except Exception:
+            logger.exception("Download preparation failed for %s", media_type)
+            st.error(f"Failed to prepare {media_type} file.")
+
+
 def render_download_section(module: Any, url: str) -> None:
-    choices = media_options(module)
-    selected_media = st.radio(
-        "Media type",
-        choices,
-        horizontal=True,
-        index=0,
-    )
+    st.write("**Downloads**")
+    col1, col2 = st.columns(2)
 
-    prepare_click = st.button("Prepare Download", use_container_width=True)
-    if prepare_click:
-        clear_prepared()
-        sweep_temp_files()
+    with col1:
+        if st.button("Download Video", use_container_width=True):
+            prepare_download(module, url, "video")
 
-        with st.spinner("Preparing media file..."):
-            try:
-                prepared = module.download(url, selected_media, TEMP_DIR)
-                st.session_state.prepared = prepared
-                st.success("File is ready.")
-            except Exception as exc:
-                logger.exception("Download preparation failed")
-                st.error("Failed to prepare media file.")
+    with col2:
+        if "audio" in media_options(module):
+            if st.button("Download Audio", use_container_width=True):
+                prepare_download(module, url, "audio")
 
     prepared = st.session_state.get("prepared")
     if prepared:
@@ -136,7 +136,7 @@ def render_download_section(module: Any, url: str) -> None:
 
         with file_path.open("rb") as handle:
             st.download_button(
-                label="Download file",
+                label=f"Save {file_path.suffix.lstrip('.').upper() or 'file'}",
                 data=handle,
                 file_name=prepared["file_name"],
                 mime=prepared["mime_type"],
@@ -154,6 +154,8 @@ def main() -> None:
 
     st.markdown("### Reels Gremlin")
     st.caption("Analyze and download content from major platforms")
+    if shutil.which("ffmpeg") is None:
+        st.warning("ffmpeg is not installed. Video/audio merge downloads may fail.")
     st.divider()
 
     platforms = platform_registry()
