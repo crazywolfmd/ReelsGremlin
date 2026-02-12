@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from yt_dlp import YoutubeDL
 
@@ -42,6 +42,7 @@ def download_media(
     platform_code: str,
     storage_dir: Path,
     cookiefile: str | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, str]:
     storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -57,6 +58,8 @@ def download_media(
         "quiet": True,
         "no_warnings": True,
     }
+    if progress_callback:
+        opts["progress_hooks"] = [lambda data: _progress_hook(data, progress_callback)]
     if cookiefile:
         opts["cookiefile"] = cookiefile
 
@@ -73,6 +76,29 @@ def download_media(
         "file_name": file_path.name,
         "mime_type": mime,
     }
+
+
+def _progress_hook(data: dict[str, Any], callback: Callable[[dict[str, Any]], None]) -> None:
+    status = data.get("status")
+    if status == "downloading":
+        downloaded = data.get("downloaded_bytes")
+        total = data.get("total_bytes") or data.get("total_bytes_estimate")
+        percent = None
+        if isinstance(downloaded, (int, float)) and isinstance(total, (int, float)) and total > 0:
+            percent = float(downloaded) / float(total) * 100.0
+        callback(
+            {
+                "status": "downloading",
+                "percent": percent,
+                "downloaded_bytes": downloaded,
+                "total_bytes": total,
+                "percent_str": data.get("_percent_str"),
+            }
+        )
+        return
+
+    if status == "finished":
+        callback({"status": "finished"})
 
 
 def _resolve_file_path(info: dict[str, Any], storage_dir: Path) -> Path:

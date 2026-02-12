@@ -12,8 +12,15 @@ def analyze(url: str) -> dict:
     return analyze_url(url, _cookiefile())
 
 
-def download(url: str, media_type: str, storage_dir):
-    return download_media(url, media_type, PLATFORM_CODE, storage_dir, _cookiefile())
+def download(url: str, media_type: str, storage_dir, progress_callback=None):
+    return download_media(
+        url,
+        media_type,
+        PLATFORM_CODE,
+        storage_dir,
+        _cookiefile(),
+        progress_callback=progress_callback,
+    )
 
 
 def _cookiefile() -> str | None:

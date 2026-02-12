@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import time
 from pathlib import Path
@@ -86,7 +87,7 @@ def clear_prepared() -> None:
 
 def render_metadata(result: dict[str, Any]) -> None:
     if result.get("thumbnail"):
-        st.image(result["thumbnail"], use_container_width=True)
+        st.image(result["thumbnail"], width="stretch")
 
     st.subheader(result.get("title") or "Untitled")
     st.write("**Description**")
@@ -99,17 +100,70 @@ def media_options(module: Any) -> list[str]:
     return ["video"]
 
 
+def _progress_label(media_type: str, data: dict[str, Any]) -> str:
+    percent = data.get("percent")
+    downloaded = _format_bytes(data.get("downloaded_bytes"))
+    total = _format_bytes(data.get("total_bytes"))
+    if isinstance(percent, (int, float)):
+        if downloaded and total:
+            return f"{media_type.capitalize()} download: {percent:.1f}% ({downloaded} / {total})"
+        return f"{media_type.capitalize()} download: {percent:.1f}%"
+
+    percent_str = data.get("percent_str")
+    if isinstance(percent_str, str):
+        match = re.search(r"[0-9]+(?:\\.[0-9]+)?", percent_str)
+        if match:
+            return f"{media_type.capitalize()} download: {match.group(0)}%"
+    return f"Downloading {media_type}..."
+
+
+def _format_bytes(value: Any) -> str | None:
+    if not isinstance(value, (int, float)) or value < 0:
+        return None
+    size = float(value)
+    units = ["B", "KiB", "MiB", "GiB", "TiB"]
+    for unit in units:
+        if size < 1024.0 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(size)}{unit}"
+            return f"{size:.2f}{unit}"
+        size /= 1024.0
+    return None
+
+
 def prepare_download(module: Any, url: str, media_type: str) -> None:
     clear_prepared()
     sweep_temp_files()
+    progress_text = st.empty()
+    progress_bar = st.progress(0.0, text=f"Starting {media_type} download...")
 
     with st.spinner(f"Preparing {media_type} file..."):
         try:
-            prepared = module.download(url, media_type, TEMP_DIR)
+            def on_progress(data: dict[str, Any]) -> None:
+                status = data.get("status")
+                if status == "downloading":
+                    progress_label = _progress_label(media_type, data)
+                    percent = data.get("percent")
+                    if isinstance(percent, (int, float)):
+                        value = min(max(float(percent) / 100.0, 0.0), 1.0)
+                        progress_bar.progress(value, text=progress_label)
+                    else:
+                        progress_text.info(progress_label)
+                elif status == "finished":
+                    progress_bar.progress(1.0, text="Download complete. Finalizing file...")
+
+            prepared = module.download(
+                url,
+                media_type,
+                TEMP_DIR,
+                progress_callback=on_progress,
+            )
             st.session_state.prepared = prepared
+            progress_text.empty()
             st.success(f"{media_type.capitalize()} is ready.")
         except Exception:
             logger.exception("Download preparation failed for %s", media_type)
+            progress_text.empty()
             st.error(f"Failed to prepare {media_type} file.")
 
 
@@ -118,12 +172,12 @@ def render_download_section(module: Any, url: str) -> None:
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("Download Video", use_container_width=True):
+        if st.button("Download Video 🎬", width="stretch"):
             prepare_download(module, url, "video")
 
     with col2:
         if "audio" in media_options(module):
-            if st.button("Download Audio", use_container_width=True):
+            if st.button("Download Audio 🎵", width="stretch"):
                 prepare_download(module, url, "audio")
 
     prepared = st.session_state.get("prepared")
@@ -140,7 +194,7 @@ def render_download_section(module: Any, url: str) -> None:
                 data=handle,
                 file_name=prepared["file_name"],
                 mime=prepared["mime_type"],
-                use_container_width=True,
+                width="stretch",
             )
 
         st.caption(
@@ -164,7 +218,7 @@ def main() -> None:
     st.divider()
     url = st.text_input("Paste content URL", placeholder="https://...")
 
-    analyze_button = st.button("Analyze Content", use_container_width=True)
+    analyze_button = st.button("Analyze Content", width="stretch")
     if analyze_button:
         if not url.strip():
             st.warning("Please provide a URL.")
