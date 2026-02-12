@@ -36,12 +36,12 @@ st.markdown(
     }
     [data-baseweb="select"] * {
         font-family: 'IBM Plex Mono', monospace !important;
-        font-size: 0.92rem !important;
+        font-size: 0.85rem !important;
     }
     .stTextInput input,
     .stTextInput input::placeholder {
         font-family: 'IBM Plex Mono', monospace !important;
-        font-size: 0.92rem !important;
+        font-size: 0.85rem !important;
     }
     </style>
     """,
@@ -50,6 +50,7 @@ st.markdown(
 
 TEMP_DIR = Path(os.getenv("TEMP_DOWNLOAD_DIR", ".tmp_downloads"))
 TEMP_TTL_SECONDS = int(os.getenv("TEMP_TTL_SECONDS", "600"))
+DISABLE_YOUTUBE_ON_CLOUD = os.getenv("DISABLE_YOUTUBE_ON_CLOUD", "1") == "1"
 
 
 def ensure_temp_dir() -> None:
@@ -87,6 +88,20 @@ def platform_registry() -> dict[str, Any]:
         "Instagram": instagram,
         "TikTok": tiktok,
     }
+
+
+def is_streamlit_cloud() -> bool:
+    sharing_mode = os.getenv("STREAMLIT_SHARING_MODE", "").lower()
+    streamlit_runtime = os.getenv("STREAMLIT_RUNTIME", "").lower()
+    return sharing_mode == "community" or streamlit_runtime == "cloud"
+
+
+def youtube_download_blocked(platform_name: str) -> bool:
+    return (
+        platform_name == "YouTube"
+        and DISABLE_YOUTUBE_ON_CLOUD
+        and is_streamlit_cloud()
+    )
 
 
 def init_state() -> None:
@@ -151,6 +166,26 @@ def _format_bytes(value: Any) -> str | None:
     return None
 
 
+def _user_friendly_error(exc: Exception, action: str) -> str:
+    raw = str(exc).strip()
+    text = re.sub(r"^\s*ERROR:\s*", "", raw, flags=re.IGNORECASE)
+
+    if "There is no video in this post" in text:
+        return "This Instagram post does not contain a video."
+    if "Requested content is not available, rate-limit reached or login required" in text:
+        return (
+            "Instagram blocked access for this request (rate limit or login required). "
+            "Try again later or configure COOKIES_INSTAGRAM/COOKIES_FILE."
+        )
+    if "HTTP Error 403" in text:
+        return "Source blocked this download request (HTTP 403). Try another link or try later."
+    if "Unsupported URL" in text:
+        return "Unsupported URL. Please paste a direct post/video URL."
+    if text:
+        return text
+    return f"Failed to {action}."
+
+
 def prepare_download(module: Any, url: str, media_type: str) -> None:
     clear_prepared()
     sweep_temp_files()
@@ -181,13 +216,20 @@ def prepare_download(module: Any, url: str, media_type: str) -> None:
             st.session_state.prepared = prepared
             progress_text.empty()
             st.success(f"{media_type.capitalize()} is ready.")
-        except Exception:
+        except Exception as exc:
             logger.exception("Download preparation failed for %s", media_type)
             progress_text.empty()
-            st.error(f"Failed to prepare {media_type} file.")
+            st.error(_user_friendly_error(exc, f"prepare {media_type} file"))
 
 
-def render_download_section(module: Any, url: str) -> None:
+def render_download_section(module: Any, url: str, platform_name: str) -> None:
+    if youtube_download_blocked(platform_name):
+        st.info(
+            "YouTube download is temporarily unavailable on this host due source-side restrictions. "
+            "Use a private VPS/backend host for reliable YouTube downloads."
+        )
+        return
+
     st.write("**Downloads**")
     col1, col2 = st.columns(2)
     requested_media: str | None = None
@@ -258,14 +300,14 @@ def main() -> None:
                 except Exception as exc:
                     logger.exception("Analysis failed")
                     st.session_state.analysis = None
-                    st.error("Failed to analyze URL. Check the link and try again.")
+                    st.error(_user_friendly_error(exc, "analyze URL"))
 
     result = st.session_state.get("analysis")
     analysis_url = st.session_state.get("analysis_url")
     if result and analysis_url:
         render_metadata(result)
         st.divider()
-        render_download_section(platforms[selected_platform], analysis_url)
+        render_download_section(platforms[selected_platform], analysis_url, selected_platform)
 
 
 if __name__ == "__main__":
