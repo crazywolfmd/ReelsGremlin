@@ -29,14 +29,16 @@ Simple UI. Clean logic. Modular backend.
 
 Designed with extensibility in mind.
 
+```text
 main.py
 platforms/
-└── init.py
-└── youtube.py
-└── facebook.py
-└── instagram.py
+├── __init__.py
+├── youtube.py
+├── facebook.py
+├── instagram.py
 └── tiktok.py
 .streamlit/config.toml
+```
 
 ---
 
