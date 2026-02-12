@@ -139,25 +139,28 @@ def media_options(module: Any) -> list[str]:
 
 
 def render_auth_options() -> str | None:
-    with st.expander("Optional authenticated session", expanded=False):
-        st.caption(
-            "Anonymous mode is default. Upload a Netscape cookies.txt file only if a platform blocks anonymous access. "
-            "Do not enter username/password in this app."
-        )
-        uploaded = st.file_uploader(
-            "Upload cookies.txt (optional)",
-            type=["txt"],
-            key="uploaded_cookies_txt",
-        )
-        if uploaded is None:
-            st.caption("Mode: anonymous-only")
-            return None
+    st.caption(
+        "Mode: anonymous-only by default. Enable authenticated mode only if a platform blocks access."
+    )
+    use_auth = st.checkbox("Use cookies.txt for authenticated mode", value=False)
+    if not use_auth:
+        st.caption("Current mode: anonymous-only")
+        return None
 
-        ensure_temp_dir()
-        cookie_path = TEMP_DIR / f".session_{st.session_state.session_id}_cookies.txt"
-        cookie_path.write_bytes(uploaded.getvalue())
-        st.caption("Mode: authenticated via uploaded cookies (session-scoped)")
-        return str(cookie_path)
+    uploaded = st.file_uploader(
+        "Upload cookies.txt (Netscape format)",
+        type=["txt"],
+        key="uploaded_cookies_txt",
+    )
+    if uploaded is None:
+        st.info("Authenticated mode enabled. Upload cookies.txt to continue.")
+        return None
+
+    ensure_temp_dir()
+    cookie_path = TEMP_DIR / f".session_{st.session_state.session_id}_cookies.txt"
+    cookie_path.write_bytes(uploaded.getvalue())
+    st.caption("Current mode: authenticated (session-scoped cookies)")
+    return str(cookie_path)
 
 
 def _progress_label(media_type: str, data: dict[str, Any]) -> str:
