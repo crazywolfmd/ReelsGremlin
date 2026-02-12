@@ -27,6 +27,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Reels Gremlin", page_icon="RG", layout="centered")
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    .stApp, .stApp * {
+        font-family: 'IBM Plex Mono', monospace !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 TEMP_DIR = Path(os.getenv("TEMP_DOWNLOAD_DIR", ".tmp_downloads"))
 TEMP_TTL_SECONDS = int(os.getenv("TEMP_TTL_SECONDS", "600"))
