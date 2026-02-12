@@ -170,15 +170,19 @@ def prepare_download(module: Any, url: str, media_type: str) -> None:
 def render_download_section(module: Any, url: str) -> None:
     st.write("**Downloads**")
     col1, col2 = st.columns(2)
+    requested_media: str | None = None
 
     with col1:
-        if st.button("Download Video 🎬", width="stretch"):
-            prepare_download(module, url, "video")
+        if st.button("Download Video 🎬", width="stretch", key="download_video_btn"):
+            requested_media = "video"
 
     with col2:
         if "audio" in media_options(module):
-            if st.button("Download Audio 🎵", width="stretch"):
-                prepare_download(module, url, "audio")
+            if st.button("Download Audio 🎵", width="stretch", key="download_audio_btn"):
+                requested_media = "audio"
+
+    if requested_media:
+        prepare_download(module, url, requested_media)
 
     prepared = st.session_state.get("prepared")
     if prepared:

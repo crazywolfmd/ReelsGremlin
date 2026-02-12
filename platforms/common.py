@@ -49,7 +49,7 @@ def download_media(
     base = f"{platform_code}_{media_type}_{timestamp()}"
     outtmpl = str(storage_dir / f"{base}.%(ext)s")
 
-    fmt = "bestaudio/best" if media_type == "audio" else "bestvideo+bestaudio/best"
+    fmt = "bestaudio/best" if media_type == "audio" else "best[ext=mp4]/bestvideo+bestaudio/best"
 
     opts: dict[str, Any] = {
         "format": fmt,
@@ -57,6 +57,18 @@ def download_media(
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
+        "retries": 10,
+        "fragment_retries": 10,
+        "file_access_retries": 3,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
     }
     if progress_callback:
         opts["progress_hooks"] = [lambda data: _progress_hook(data, progress_callback)]
