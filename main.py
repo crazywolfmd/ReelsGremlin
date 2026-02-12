@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from pathlib import Path
@@ -11,6 +12,7 @@ from platforms import facebook, instagram, tiktok, youtube
 
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Reels Gremlin", page_icon="RG", layout="centered")
 
@@ -121,8 +123,8 @@ def render_download_section(module: Any, url: str) -> None:
                 st.session_state.prepared = prepared
                 st.success("File is ready.")
             except Exception as exc:
+                logger.exception("Download preparation failed")
                 st.error("Failed to prepare media file.")
-                st.exception(exc)
 
     prepared = st.session_state.get("prepared")
     if prepared:
@@ -174,9 +176,9 @@ def main() -> None:
                     st.session_state.analysis_url = url.strip()
                     st.success("Content analyzed successfully.")
                 except Exception as exc:
+                    logger.exception("Analysis failed")
                     st.session_state.analysis = None
-                    st.error("Failed to analyze URL.")
-                    st.exception(exc)
+                    st.error("Failed to analyze URL. Check the link and try again.")
 
     result = st.session_state.get("analysis")
     analysis_url = st.session_state.get("analysis_url")
