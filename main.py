@@ -34,6 +34,15 @@ st.markdown(
     .stApp, .stApp * {
         font-family: 'IBM Plex Mono', monospace !important;
     }
+    [data-baseweb="select"] * {
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 0.92rem !important;
+    }
+    .stTextInput input,
+    .stTextInput input::placeholder {
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 0.92rem !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
