@@ -8,20 +8,20 @@ PLATFORM_CODE = "tt"
 SUPPORTS_AUDIO = True
 
 
-def analyze(url: str) -> dict:
-    return analyze_url(url, _cookiefile())
+def analyze(url: str, cookiefile: str | None = None) -> dict:
+    return analyze_url(url, _cookiefile(cookiefile))
 
 
-def download(url: str, media_type: str, storage_dir, progress_callback=None):
+def download(url: str, media_type: str, storage_dir, progress_callback=None, cookiefile: str | None = None):
     return download_media(
         url,
         media_type,
         PLATFORM_CODE,
         storage_dir,
-        _cookiefile(),
+        _cookiefile(cookiefile),
         progress_callback=progress_callback,
     )
 
 
-def _cookiefile() -> str | None:
-    return os.getenv("COOKIES_TIKTOK") or os.getenv("COOKIES_FILE")
+def _cookiefile(override: str | None = None) -> str | None:
+    return override or os.getenv("COOKIES_TIKTOK") or os.getenv("COOKIES_FILE")

@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -111,6 +112,8 @@ def init_state() -> None:
         st.session_state.analysis_url = ""
     if "prepared" not in st.session_state:
         st.session_state.prepared = None
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = uuid.uuid4().hex
 
 
 def clear_prepared() -> None:
@@ -133,6 +136,28 @@ def media_options(module: Any) -> list[str]:
     if getattr(module, "SUPPORTS_AUDIO", True):
         return ["video", "audio"]
     return ["video"]
+
+
+def render_auth_options() -> str | None:
+    with st.expander("Optional authenticated session", expanded=False):
+        st.caption(
+            "Anonymous mode is default. Upload a Netscape cookies.txt file only if a platform blocks anonymous access. "
+            "Do not enter username/password in this app."
+        )
+        uploaded = st.file_uploader(
+            "Upload cookies.txt (optional)",
+            type=["txt"],
+            key="uploaded_cookies_txt",
+        )
+        if uploaded is None:
+            st.caption("Mode: anonymous-only")
+            return None
+
+        ensure_temp_dir()
+        cookie_path = TEMP_DIR / f".session_{st.session_state.session_id}_cookies.txt"
+        cookie_path.write_bytes(uploaded.getvalue())
+        st.caption("Mode: authenticated via uploaded cookies (session-scoped)")
+        return str(cookie_path)
 
 
 def _progress_label(media_type: str, data: dict[str, Any]) -> str:
@@ -186,7 +211,7 @@ def _user_friendly_error(exc: Exception, action: str) -> str:
     return f"Failed to {action}."
 
 
-def prepare_download(module: Any, url: str, media_type: str) -> None:
+def prepare_download(module: Any, url: str, media_type: str, cookiefile: str | None) -> None:
     clear_prepared()
     sweep_temp_files()
     progress_text = st.empty()
@@ -212,6 +237,7 @@ def prepare_download(module: Any, url: str, media_type: str) -> None:
                 media_type,
                 TEMP_DIR,
                 progress_callback=on_progress,
+                cookiefile=cookiefile,
             )
             st.session_state.prepared = prepared
             progress_text.empty()
@@ -222,7 +248,7 @@ def prepare_download(module: Any, url: str, media_type: str) -> None:
             st.error(_user_friendly_error(exc, f"prepare {media_type} file"))
 
 
-def render_download_section(module: Any, url: str, platform_name: str) -> None:
+def render_download_section(module: Any, url: str, platform_name: str, cookiefile: str | None) -> None:
     if youtube_download_blocked(platform_name):
         st.info(
             "YouTube download is temporarily unavailable on this host due source-side restrictions. "
@@ -244,7 +270,7 @@ def render_download_section(module: Any, url: str, platform_name: str) -> None:
                 requested_media = "audio"
 
     if requested_media:
-        prepare_download(module, url, requested_media)
+        prepare_download(module, url, requested_media, cookiefile)
 
     prepared = st.session_state.get("prepared")
     if prepared:
@@ -280,6 +306,7 @@ def main() -> None:
 
     platforms = platform_registry()
     selected_platform = st.selectbox("Select platform", list(platforms.keys()))
+    user_cookiefile = render_auth_options()
 
     st.divider()
     url = st.text_input("Paste content URL", placeholder="https://...")
@@ -293,7 +320,7 @@ def main() -> None:
             with st.spinner("Analyzing content..."):
                 try:
                     module = platforms[selected_platform]
-                    result = module.analyze(url.strip())
+                    result = module.analyze(url.strip(), cookiefile=user_cookiefile)
                     st.session_state.analysis = result
                     st.session_state.analysis_url = url.strip()
                     st.success("Content analyzed successfully.")
@@ -307,7 +334,12 @@ def main() -> None:
     if result and analysis_url:
         render_metadata(result)
         st.divider()
-        render_download_section(platforms[selected_platform], analysis_url, selected_platform)
+        render_download_section(
+            platforms[selected_platform],
+            analysis_url,
+            selected_platform,
+            user_cookiefile,
+        )
 
 
 if __name__ == "__main__":
